@@ -1,0 +1,85 @@
+---
+- name: "####### Starting Tests #######"
+  debug: msg="Running connection tests for {{Flux}}"
+
+- name: setting result OK
+  set_fact: result="OK"
+
+- block:
+  - name:  SRC SSHabble
+    wait_for: host="{{Flux.SRC}}" port=22 state=started delay=0 timeout=1 connect_timeout=1
+    register: SRC_test
+  
+  rescue:
+  - name: SRC not SSHable
+    set_fact: result="SRC ERROR"
+    
+##### SRC is SSHable
+- block:
+  - name: 1st test TCP
+    sockClient: BindIP="{{Flux.DST}}" Port="{{Flux.Port}}" Protocol="{{Flux.Proto}}" Message="{{Flux.Message}}"
+    register: test1
+    delegate_to: "{{Flux.SRC}}"
+    remote_user: ansible_user
+
+  #- name: is test on BACKEND?
+    #set_fact: result="PORT CLOSED"
+    #when: Flux.Proto|upper=="HTTP"  and Flux.BACKEND is defined
+
+  rescue:
+    - block:
+##### SRC is SSHable and DST Port not open
+      - name: test remote SSH
+        wait_for: host="{{Flux.DST|default(Flux.DST)}}" port=22  state=started delay=0 timeout=1 connect_timeout=1
+  
+      - name: DST Port not reachable 
+        set_fact: result="PORT CLOSED"
+
+      rescue:
+        - name: DST not SSHable
+          set_fact: result="DST ERROR"
+
+  when: result == "OK"
+
+##### SRC is SSHable and DST Port not open and DST is SSHable
+- block:
+  - name: setup new server
+    sockServer: Port="{{Flux.BACKENDPort|default(Flux.Port)}}" Protocol="{{Flux.Proto}}" 
+    async: 10
+    delegate_to: "{{Flux.BACKEND|default(Flux.DST)}}"
+    remote_user: ansible_user
+    become: true
+    become_user: root
+  
+  - name: 2nd test TCP local
+    #script: templates/sockClient.py "{{Flux.DST}}" "{{Flux.Port}}" "{{Flux.Proto}}" "toto"
+    sockClient: BindIP="{{Flux.DST}}" Port="{{Flux.Port}}" Protocol="{{Flux.Proto}}" Message="{{Flux.Message}}"
+    delegate_to: "{{Flux.SRC}}"
+    register: test2
+    remote_user: ansible_user
+
+  - name: setting result OK
+    set_fact: result="OK"
+
+#
+##### SRC is SSHable and DST Port not open and DST is SSHable and DST Port still not openn
+  rescue:
+  - name: setting result ERROR
+    set_fact: result="NO ACCESS with private service"
+
+  when: result == "PORT CLOSED" or (Flux.Proto|upper=="HTTP"  and Flux.BACKEND is defined)
+
+- name: save result
+  lineinfile: 
+    dest="{{inventory}}" 
+    regexp="(?! .#)(?!.*BACKEND.*)( {{Flux.SRC}},.* {{Flux.DST}},.* {{Flux.Port}},.* {{Flux.Proto}},.*{{Flux.Message}}.*)$"
+    line="  - {SRC{{":"}} {{Flux.SRC}}, DST{{":"}} {{Flux.DST}}, Port{{":"}} {{Flux.Port}}, Proto{{":"}} {{Flux.Proto}}, Message{{":"}} '{{Flux.Message}}', Status{{":"}} {{result}}, Result1{{":"}} {{test1.stdout_lines|default("")}}, Result2{{":"}} {{test2.stdout_lines|default("")}}}" 
+  when: "Flux.BACKEND is not defined"
+
+- name: save BACKEND result
+  lineinfile: 
+    dest="{{inventory}}" 
+    regexp="((?! *#.*).).* {{Flux.SRC}},.* {{Flux.DST}},.* {{Flux.Port}},.* {{Flux.Proto}},.* {{Flux.BACKEND}},.* {{Flux.BACKENDPort}},.*{{Flux.Message}}.*"
+    line="  - {SRC{{":"}} {{Flux.SRC}}, DST{{":"}} {{Flux.DST}}, Port{{":"}} {{Flux.Port}}, Proto{{":"}} {{Flux.Proto}}, BACKEND{{":"}} {{Flux.BACKEND}}, BACKENDPort{{":"}} {{ Flux.BACKENDPort}}, Message{{":"}} '{{Flux.Message}}', Status{{":"}} {{result}}, Result1{{":"}} {{test1.stdout_lines|default("")}}, Result2{{":"}} {{test2.stdout_lines|default("")}}}"
+  when: "Flux.BACKEND is defined"
+

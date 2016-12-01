@@ -1,0 +1,27 @@
+matrix:
+  # Shoud be NOK with netcat and iptable start on 219
+  - {SRC: 192.168.124.218, DST: 192.168.124.219, Port: 2222, Proto: http, Message: 'http://127.0.0.1', Status: NO ACCESS with private service, Result1: [], Result2: []}
+
+  - {SRC: 192.168.124.218, DST: 192.168.124.219, Port: 2222, Proto: udp, Message: 'test', Status: NO ACCESS with private service, Result1: [], Result2: []}
+
+  # Shoud be OK with netcat and iptable start off 218
+  - {SRC: 192.168.124.219, DST: 192.168.124.218, Port: 2222, Proto: tcp, Message: 'test', Status: OK, Result1: [], Result2: [u'test']}
+  - {SRC: 192.168.124.219, DST: 192.168.124.218, Port: 2222, Proto: udp, Message: 'test', Status: OK, Result1: [], Result2: [u'test']}
+  
+  # Should be OK
+  - {SRC: 192.168.124.218, DST: 192.168.124.219, Port: 22, Proto: tcp, Message: 'test', Status: OK, Result1: [u'SSH-2.0-OpenSSH_5.3', u'Protocol mismatch.'], Result2: }
+  - {SRC: 192.168.124.219, DST: 192.168.124.218, Port: 22, Proto: tcp, Message: 'test', Status: OK, Result1: [u'SSH-2.0-OpenSSH_5.3', u'Protocol mismatch.'], Result2: }
+  
+  # Shoud be SRC Error
+  #- {SRC: 192.168.124.217, DST: 192.168.124.218, Port: 2222, Proto: tcp, Message: 'test', Status: SRC ERROR, Result1: , Result2: }
+  ## Shoud be DST ERROR
+  #- {SRC: 192.168.124.219, DST: 192.168.124.217, Port: 2222, Proto: tcp, Message: 'test', Status: DST ERROR, Result1: [], Result2: }
+
+
+  - {SRC: 192.168.124.218, DST: 192.168.124.219, Port: 2222, Proto: http, BACKEND: 192.168.124.218, BACKENDPort: 1234, Message: '', Status: NO ACCESS with private service, Result1: [], Result2: []}
+  - {SRC: 192.168.124.219, DST: 192.168.124.218, Port: 222, Proto: http, BACKEND: 192.168.124.219, BACKENDPort: 1234, Message: '', Status: OK, Result1: [u'OK'], Result2: [u'Service Unavailable']}
+  - {SRC: 192.168.124.219, DST: 192.168.124.218, Port: 222, Proto: http, BACKEND: 192.168.124.218, BACKENDPort: 1234, Message: '', Status: OK, Result1: [u'Service Unavailable'], Result2: [u'OK']}
+
+
+# MESSAGE: chaine de caractere envoyée au serveur, celui-ci renvoyant la chaine. Si les 2 chaines sont identiques, le status est OK, sinon, il est Changed
+# Si leprotocol est HTTP, ce champs n'est pas utilisé. Le status est OK si le code d'erreur HTTP est 2xx ou 3xx, dans les autres cas, il est Changed

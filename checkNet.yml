@@ -1,0 +1,14 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars_files:
+  - "{{inventory}}"
+
+  tasks:
+
+  - name: test
+    include: sub-test.yml Flux={{item}}
+    register: result
+    with_items: "{{matrix}}"
+
